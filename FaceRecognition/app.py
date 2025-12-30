@@ -228,6 +228,7 @@ class ResNetStrategy(ModelStrategy):
                 self.model.load_state_dict(torch.load(path, map_location=device))
                 self.model.float() # Ensure Float32
                 self.model.to(device).eval()
+                print(f"ResNet Dtype: {self.model.conv1.weight.dtype}") # DEBUG
                 self.loaded = True
                 print("ResNet18 loaded successfully.")
             except Exception as e: 
@@ -249,6 +250,9 @@ class ResNetStrategy(ModelStrategy):
         if not self.loaded: return "N/A", 0.0
         try:
             inp = self.preprocess(face_pil).to(self.device)
+            # Force input type to match model type (fix for Double/Float mismatch)
+            inp = inp.type_as(next(self.model.parameters()))
+            
             with torch.no_grad():
                 out = self.model(inp)
                 probs = torch.nn.functional.softmax(out, dim=1)
@@ -265,10 +269,13 @@ class EmbeddingStrategy(ModelStrategy):
         if FACENET_AVAIL and os.path.exists(path):
             try:
                 self.model = EmbeddingClassifier()
-                self.model.load_state_dict(torch.load(path, map_location=device))
+                self.model.load_state_dict(torch.load(path, map_location=device), strict=False)
                 self.model.to(device).eval()
                 self.loaded = True
-            except: pass
+                print("FaceNet loaded successfully.")
+            except Exception as e:
+                print(f"FaceNet Loading Error: {e}")
+                pass
 
     def preprocess(self, img_pil):
         # 160x160, -1 to 1
